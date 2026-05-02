@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #06080f;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e2d40; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2d4460; }
+
+/* ── Animations ─────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+@keyframes scanline {
+  0%   { transform: translateY(-100vh); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(14, 165, 233, 0.4); }
+  50%       { box-shadow: 0 0 24px rgba(14, 165, 233, 0.8); }
+}
+
+/* ── Utility classes ─────────────────────────────────── */
+.spin  { animation: spin  1s linear infinite; }
+.pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.blink { animation: blink 1s step-end infinite; }
+.glow  { animation: glow  2s ease-in-out infinite; }
+
+/* ── Selection ───────────────────────────────────────── */
+::selection {
+  background: rgba(14, 165, 233, 0.25);
+  color: #e2e8f0;
+}
+
+/* ── Button base reset ───────────────────────────────── */
+button {
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  outline: none;
+}
+button:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* ── Input base ──────────────────────────────────────── */
+input, textarea, select {
+  font-family: 'JetBrains Mono', monospace;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, textarea:focus {
+  border-color: #0ea5e9 !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+}
+
+/* ── Table ───────────────────────────────────────────── */
+table { border-collapse: collapse; }
+tr { transition: background 0.15s ease; }
+
+/* ── Transitions ─────────────────────────────────────── */
+.transition-all { transition: all 0.25s ease; }
+.transition-colors { transition: color 0.2s, background-color 0.2s, border-color 0.2s; }
