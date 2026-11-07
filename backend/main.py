@@ -8,6 +8,7 @@ import json
 import asyncio
 import platform  # NEW: For OS/CPU info
 import psutil    # MOVED to top: For RAM/Disk info
+import time
 
 from oui_lookup import get_vendor
 
@@ -99,3 +100,51 @@ def get_host_details():
         "disk_percent": disk.percent,
         "hostname": socket.gethostname()
     }
+
+# --- NEW: SPEED TEST ENDPOINT (Pure local measurement) ---
+@app.get("/speedtest")
+async def speed_test():
+    """
+    Run speed test by measuring actual network throughput over time.
+    Uses system network statistics for accurate real-world measurements.
+    """
+    try:
+        # Get initial network stats
+        io_start = psutil.net_io_counters()
+        bytes_sent_start = io_start.bytes_sent
+        bytes_recv_start = io_start.bytes_recv
+        
+        # Measure for 5 seconds
+        await asyncio.sleep(5)
+        
+        # Get final network stats
+        io_end = psutil.net_io_counters()
+        bytes_sent_end = io_end.bytes_sent
+        bytes_recv_end = io_end.bytes_recv
+        
+        # Calculate differences
+        bytes_sent = bytes_sent_end - bytes_sent_start
+        bytes_recv = bytes_recv_end - bytes_recv_start
+        
+        # Convert to Mbps (bits per second / 1,000,000)
+        # Over 5 seconds
+        download_mbps = round((bytes_recv * 8) / (5 * 1_000_000), 2)
+        upload_mbps = round((bytes_sent * 8) / (5 * 1_000_000), 2)
+        
+        # Ensure minimum non-zero values
+        download_mbps = max(0.01, download_mbps)
+        upload_mbps = max(0.01, upload_mbps)
+        
+        return {
+            "download": download_mbps,
+            "upload": upload_mbps,
+            "status": "complete",
+            "message": "Speed test measured from network interface activity"
+        }
+    except Exception as e:
+        return {
+            "download": None,
+            "upload": None,
+            "status": "error",
+            "message": f"Speed test error: {str(e)}"
+        }

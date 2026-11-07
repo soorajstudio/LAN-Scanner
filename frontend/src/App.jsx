@@ -53,8 +53,35 @@ const makeTheme = (dark) => ({
   navBg: dark ? 'rgba(6,8,15,0.85)' : 'rgba(240,244,248,0.85)',
 });
 
+// ─── Toast Notification ─────────────────────────────────────────────────────
+function Toast({ message, type = 'success', onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = type === 'success' ? 'rgba(16,185,129,0.95)' : 'rgba(239,68,68,0.95)';
+  const borderColor = type === 'success' ? '#10b981' : '#ef4444';
+  
+  return (
+    <div style={{
+      position: 'fixed', bottom: '24px', right: '24px', zIndex: 10000,
+      background: bgColor, border: `1px solid ${borderColor}`, borderRadius: '12px',
+      padding: '14px 18px', color: 'white', fontSize: '0.85rem', fontWeight: '600',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.3)', backdropFilter: 'blur(12px)',
+      display: 'flex', alignItems: 'center', gap: '10px', animation: 'slideUp 0.3s ease',
+      maxWidth: '300px', wordBreak: 'break-word'
+    }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        {type === 'success' ? <polyline points="20 6 9 17 4 12" /> : <path d="M18 6L6 18M6 6l12 12" />}
+      </svg>
+      {message}
+    </div>
+  );
+}
+
 // ─── Radar Sweep Canvas ─────────────────────────────────────────────────────
-function RadarCanvas({ devices, size = 320 }) {
+function RadarCanvas({ devices, size = 320, isDark = true }) {
   const canvasRef = useRef(null);
   const sweepRef = useRef(0);
   const rafRef = useRef(null);
@@ -65,7 +92,13 @@ function RadarCanvas({ devices, size = 320 }) {
     const ctx = canvas.getContext('2d');
     const cx = size / 2, cy = size / 2, r = size / 2 - 10;
 
-    // Map devices onto radar
+    const bgColor = isDark ? '#06080f' : '#f0f4f8';
+    const gridColor = isDark ? 'rgba(14,165,233,0.15)' : 'rgba(2,132,199,0.2)';
+    const crossColor = isDark ? 'rgba(14,165,233,0.1)' : 'rgba(2,132,199,0.15)';
+    const sweepColor = isDark ? 'rgba(14,165,233,0.18)' : 'rgba(2,132,199,0.15)';
+    const lineColor = isDark ? 'rgba(14,165,233,0.9)' : 'rgba(2,132,199,0.8)';
+    const shadowColor = isDark ? '#0ea5e9' : '#0284c7';
+
     const points = devices.map((_, i) => {
       const angle = (i / Math.max(devices.length, 1)) * Math.PI * 2;
       const dist = 0.35 + Math.random() * 0.5;
@@ -76,30 +109,25 @@ function RadarCanvas({ devices, size = 320 }) {
       sweepRef.current = (ts * 0.0008) % (Math.PI * 2);
       ctx.clearRect(0, 0, size, size);
 
-      // Background
-      ctx.fillStyle = '#06080f';
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, size, size);
 
-      // Concentric rings
       for (let i = 1; i <= 4; i++) {
         ctx.beginPath();
         ctx.arc(cx, cy, r * (i / 4), 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(14,165,233,0.15)';
+        ctx.strokeStyle = gridColor;
         ctx.lineWidth = 1;
         ctx.stroke();
       }
 
-      // Crosshairs
       ctx.beginPath();
       ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
       ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-      ctx.strokeStyle = 'rgba(14,165,233,0.1)';
+      ctx.strokeStyle = crossColor;
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Sweep gradient
       const sweep = sweepRef.current;
-      const grad = ctx.createConicalGradient ? null : null;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(sweep);
@@ -110,22 +138,20 @@ function RadarCanvas({ devices, size = 320 }) {
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, r, -0.5, 0);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(14,165,233,0.18)';
+      ctx.fillStyle = sweepColor;
       ctx.fill();
       ctx.restore();
 
-      // Sweep line
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + Math.cos(sweep) * r, cy + Math.sin(sweep) * r);
-      ctx.strokeStyle = 'rgba(14,165,233,0.9)';
+      ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = '#0ea5e9';
+      ctx.shadowColor = shadowColor;
       ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Device blips
       points.forEach((p, i) => {
         const bAngle = Math.atan2(p.y - cy, p.x - cx);
         let diff = (sweep - bAngle + Math.PI * 2) % (Math.PI * 2);
@@ -147,7 +173,6 @@ function RadarCanvas({ devices, size = 320 }) {
         ctx.shadowBlur = 0;
       });
 
-      // Center dot
       ctx.beginPath();
       ctx.arc(cx, cy, 4, 0, Math.PI * 2);
       ctx.fillStyle = '#38bdf8';
@@ -161,7 +186,7 @@ function RadarCanvas({ devices, size = 320 }) {
 
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [devices, size]);
+  }, [devices, size, isDark]);
 
   return (
     <canvas
@@ -249,9 +274,14 @@ function StatCard({ label, value, sub, color = '#0ea5e9', icon, glow = false }) 
 }
 
 // ─── Device Modal ───────────────────────────────────────────────────────────
-function DeviceModal({ device, onClose, theme }) {
+function DeviceModal({ device, onClose, theme, ownerName, onSaveOwner }) {
   if (!device) return null;
   const isResolved = device.name !== 'Unresolved Node';
+  const [editOwner, setEditOwner] = useState(ownerName || '');
+
+  useEffect(() => {
+    setEditOwner(ownerName || '');
+  }, [ownerName, device]);
 
   return (
     <div
@@ -272,7 +302,6 @@ function DeviceModal({ device, onClose, theme }) {
           animation: 'slideUp 0.25s ease',
         }}
       >
-        {/* Header stripe */}
         <div style={{ height: '3px', background: 'linear-gradient(90deg, #0ea5e9, #8b5cf6)' }} />
         
         <div style={{ padding: '28px', borderBottom: '1px solid #1e2d40', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -300,7 +329,39 @@ function DeviceModal({ device, onClose, theme }) {
         </div>
 
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* MAC / Vendor */}
+          {/* Owner Assignment */}
+          <div style={{ background: '#111827', borderRadius: '12px', padding: '16px', border: '1px solid #1e2d40' }}>
+            <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '8px' }}>
+              Assigned User / Owner
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                value={editOwner}
+                onChange={e => setEditOwner(e.target.value)}
+                placeholder={isResolved ? "Name" : "Cannot assign to unresolved node"}
+                disabled={!isResolved}
+                style={{
+                  flex: 1, background: '#0d1117', border: '1px solid #1e2d40', borderRadius: '8px',
+                  padding: '10px 12px', color: '#e2e8f0', fontSize: '0.85rem', outline: 'none',
+                  opacity: isResolved ? 1 : 0.5, cursor: isResolved ? 'text' : 'not-allowed'
+                }}
+              />
+              <button
+                onClick={() => onSaveOwner(device.name, editOwner)}
+                disabled={!isResolved}
+                style={{
+                  background: isResolved ? 'rgba(14,165,233,0.15)' : 'rgba(100,116,139,0.1)',
+                  color: isResolved ? '#0ea5e9' : '#64748b',
+                  border: `1px solid ${isResolved ? 'rgba(14,165,233,0.3)' : 'transparent'}`,
+                  padding: '0 16px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700',
+                  cursor: isResolved ? 'pointer' : 'not-allowed', transition: 'all 0.2s'
+                }}
+              >
+                SAVE
+              </button>
+            </div>
+          </div>
+
           <div style={{ background: '#111827', borderRadius: '12px', overflow: 'hidden', border: '1px solid #1e2d40' }}>
             <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e2d40' }}>
               <span style={{ color: '#64748b', fontSize: '0.85rem' }}>MAC Address</span>
@@ -312,7 +373,6 @@ function DeviceModal({ device, onClose, theme }) {
             </div>
           </div>
 
-          {/* Locked specs */}
           <div>
             <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
               <span>Remote Specs</span>
@@ -348,10 +408,33 @@ export default function App() {
   const [rxHistory, setRxHistory] = useState(Array(30).fill(0));
   const [filterQuery, setFilterQuery] = useState('');
   const [scanComplete, setScanComplete] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [speedTest, setSpeedTest] = useState({ testing: false, download: null, upload: null });
+
+  // ── PC Owners State ──
+  const [owners, setOwners] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nexus_owners');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    // Default initial owners
+    return {
+      'pc44': 'Anoop',
+      'pc63': 'Sooraj',
+      'pc60': 'Godwin'
+    };
+  });
+
+  const handleSetOwner = (hostname, owner) => {
+    if (!hostname || hostname === 'Unresolved Node') return;
+    const nextOwners = { ...owners, [hostname]: owner };
+    setOwners(nextOwners);
+    localStorage.setItem('nexus_owners', JSON.stringify(nextOwners));
+    setToast({ message: `✓ Owner saved: ${owner}`, type: 'success' });
+  };
 
   const theme = makeTheme(isDark);
 
-  // ── Host data ──
   useEffect(() => {
     if (activeMenu === 'Host System' && !hostData) {
       axios.get('http://127.0.0.1:8000/host')
@@ -360,7 +443,6 @@ export default function App() {
     }
   }, [activeMenu, hostData]);
 
-  // ── Telemetry ──
   useEffect(() => {
     if (activeMenu !== 'Telemetry') return;
     const source = new EventSource('http://127.0.0.1:8000/telemetry');
@@ -373,7 +455,6 @@ export default function App() {
     return () => source.close();
   }, [activeMenu]);
 
-  // ── Scan ──
   const runDiscovery = () => {
     setLoading(true);
     setScanComplete(false);
@@ -400,19 +481,38 @@ export default function App() {
     source.onerror = () => { setLoading(false); source.close(); };
   };
 
+  const runSpeedTest = async () => {
+    setSpeedTest({ testing: true, download: null, upload: null });
+    try {
+      const response = await axios.get('http://127.0.0.1:8000/speedtest');
+      
+      if (response.data.status === 'complete' && response.data.download && response.data.upload) {
+        setSpeedTest({ testing: false, download: response.data.download, upload: response.data.upload });
+        setToast({ message: `Speed test complete: ${response.data.download.toFixed(1)} Mbps ↓ / ${response.data.upload.toFixed(1)} Mbps ↑`, type: 'success' });
+      } else {
+        const errorMsg = response.data.message || 'Speed test failed - unable to reach test servers';
+        setSpeedTest({ testing: false, download: null, upload: null });
+        setToast({ message: errorMsg, type: 'error' });
+      }
+    } catch (error) {
+      setSpeedTest({ testing: false, download: null, upload: null });
+      const errorMsg = error.response?.data?.message || 'Speed test failed - connection error';
+      setToast({ message: errorMsg, type: 'error' });
+    }
+  };
+
   const filteredDevices = devices.filter(d =>
     !filterQuery ||
     d.ip.includes(filterQuery) ||
     d.name.toLowerCase().includes(filterQuery.toLowerCase()) ||
-    (d.vendor || '').toLowerCase().includes(filterQuery.toLowerCase())
+    (d.vendor || '').toLowerCase().includes(filterQuery.toLowerCase()) ||
+    (owners[d.name] || '').toLowerCase().includes(filterQuery.toLowerCase())
   );
 
   const pct = scanProgress.total ? Math.round((scanProgress.current / scanProgress.total) * 100) : 0;
 
-  // ── RENDER: Telemetry ──
   const renderTelemetry = () => (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-      {/* TX Card */}
       {[
         { label: 'Transmit (TX)', value: telemetry.tx, history: txHistory, color: '#0ea5e9' },
         { label: 'Receive (RX)', value: telemetry.rx, history: rxHistory, color: '#10b981' },
@@ -445,29 +545,63 @@ export default function App() {
           </div>
         </div>
       ))}
-
-      {/* Stats row */}
-      <StatCard label="Active Devices" value={devices.length} sub="Confirmed on subnet" color="#0ea5e9"
-        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>}
-        glow
-      />
-      <StatCard label="Resolved Nodes" value={devices.filter(d => d.name !== 'Unresolved Node').length} sub={`${devices.length - devices.filter(d => d.name !== 'Unresolved Node').length} unresolved`} color="#10b981"
-        icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}
-      />
+      <StatCard label="Active Devices" value={devices.length} sub="Confirmed on subnet" color="#0ea5e9" icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg>} glow />
+      <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <div style={{ fontSize: '0.68rem', color: theme.textMuted, fontWeight: '700', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '16px' }}>Speed Test (Ookla-style)</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Download</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: speedTest.download ? '#0ea5e9' : theme.textMuted, fontFamily: 'monospace' }}>
+                {speedTest.download !== null ? `${speedTest.download.toFixed(1)}` : '—'}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>Mbps</div>
+            </div>
+            <div style={{ background: theme.surfaceAlt, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.65rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Upload</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '800', color: speedTest.upload ? '#10b981' : theme.textMuted, fontFamily: 'monospace' }}>
+                {speedTest.upload !== null ? `${speedTest.upload.toFixed(1)}` : '—'}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: theme.textMuted, marginTop: '4px' }}>Mbps</div>
+            </div>
+          </div>
+          <button
+            onClick={runSpeedTest}
+            disabled={speedTest.testing}
+            style={{
+              width: '100%',
+              background: speedTest.testing ? 'rgba(14,165,233,0.2)' : 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+              color: speedTest.testing ? '#0ea5e9' : 'white',
+              border: 'none',
+              padding: '12px',
+              borderRadius: '9px',
+              fontWeight: '700',
+              fontSize: '0.8rem',
+              cursor: speedTest.testing ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              letterSpacing: '0.5px',
+              boxShadow: speedTest.testing ? 'none' : '0 4px 14px rgba(14,165,233,0.4)',
+              transition: 'all 0.2s',
+              fontFamily: 'inherit'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: speedTest.testing ? 'spin 1s linear infinite' : 'none' }}><path d="M21 2v6h-6M3 22v-6h6M2 11.5a10 10 0 0119.8-4.3M22 12.5a10 10 0 01-19.8 4.2"/></svg>
+            {speedTest.testing ? 'TESTING…' : 'RUN SPEED TEST'}
+          </button>
+        </div>
+      </div>
+      <StatCard label="Resolved Nodes" value={devices.filter(d => d.name !== 'Unresolved Node').length} sub={`${devices.length - devices.filter(d => d.name !== 'Unresolved Node').length} unresolved`} color="#10b981" icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>} />
     </div>
   );
 
-  // ── RENDER: Topography ──
   const renderTopography = () => (
     <div>
       {devices.length === 0 ? (
-        <div style={{
-          minHeight: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          background: theme.surface, borderRadius: '20px', border: `1px dashed ${theme.border}`, gap: '20px',
-        }}>
-          <div style={{ opacity: 0.25 }}>
-            <RadarCanvas devices={[]} size={200} />
-          </div>
+        <div style={{ minHeight: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: theme.surface, borderRadius: '20px', border: `1px dashed ${theme.border}`, gap: '20px' }}>
+          <div style={{ opacity: 0.25 }}><RadarCanvas devices={[]} size={200} isDark={isDark} /></div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '1.1rem', fontWeight: '700', color: theme.textMuted }}>No Nodes Discovered</div>
             <div style={{ fontSize: '0.85rem', color: theme.textDim, marginTop: '4px' }}>Click INITIATE DISCOVERY to sweep the subnet</div>
@@ -475,27 +609,23 @@ export default function App() {
         </div>
       ) : (
         <div>
-          {/* Radar + summary row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '20px', marginBottom: '24px', alignItems: 'start' }}>
             <div style={{ background: theme.surface, borderRadius: '20px', border: `1px solid ${theme.border}`, padding: '20px', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <RadarCanvas devices={devices} size={280} />
-              <div style={{ fontSize: '0.7rem', color: theme.textMuted, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-                {devices.length} nodes tracked
-              </div>
+              <RadarCanvas devices={devices} size={280} isDark={isDark} />
+              <div style={{ fontSize: '0.7rem', color: theme.textMuted, letterSpacing: '1.5px', textTransform: 'uppercase' }}>{devices.length} nodes tracked</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignContent: 'start' }}>
               {[
                 { label: 'Total Devices', val: devices.length, color: '#0ea5e9' },
                 { label: 'Resolved', val: devices.filter(d => d.name !== 'Unresolved Node').length, color: '#10b981' },
                 { label: 'Unresolved', val: devices.filter(d => d.name === 'Unresolved Node').length, color: '#f59e0b' },
-                { label: 'Unique Vendors', val: new Set(devices.map(d => d.vendor || 'Unknown')).size, color: '#8b5cf6' },
+                { label: 'Assigned Owners', val: Object.keys(owners).filter(k => devices.some(d => d.name === k)).length, color: '#8b5cf6' },
               ].map(({ label, val, color }) => (
                 <div key={label} style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px' }}>
                   <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700', marginBottom: '8px' }}>{label}</div>
                   <div style={{ fontSize: '2.2rem', fontWeight: '800', color, fontFamily: "'JetBrains Mono', monospace" }}>{val}</div>
                 </div>
               ))}
-              {/* Vendor breakdown */}
               <div style={{ gridColumn: '1/-1', background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '18px' }}>
                 <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700', marginBottom: '12px' }}>Vendor Distribution</div>
                 {(() => {
@@ -517,70 +647,50 @@ export default function App() {
             </div>
           </div>
 
-          {/* Filter bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }}><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
-              <input
-                value={filterQuery}
-                onChange={e => setFilterQuery(e.target.value)}
-                placeholder="Filter by IP, hostname, vendor…"
-                style={{
-                  width: '100%', background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '10px',
-                  padding: '10px 12px 10px 38px', color: theme.text, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box',
-                }}
-              />
+              <input value={filterQuery} onChange={e => setFilterQuery(e.target.value)} placeholder="Filter by IP, hostname, owner, vendor…" style={{ width: '100%', background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '10px', padding: '10px 12px 10px 38px', color: theme.text, fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }} />
             </div>
-            <div style={{ fontSize: '0.8rem', color: theme.textMuted, whiteSpace: 'nowrap' }}>
-              {filteredDevices.length} / {devices.length}
-            </div>
+            <div style={{ fontSize: '0.8rem', color: theme.textMuted, whiteSpace: 'nowrap' }}>{filteredDevices.length} / {devices.length}</div>
           </div>
 
-          {/* Device cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '14px' }}>
             {filteredDevices.map((device, idx) => {
               const resolved = device.name !== 'Unresolved Node';
+              const hasOwner = !!owners[device.name];
               const hov = hoveredCard === idx;
               return (
-                <div key={idx}
-                  onClick={() => setSelectedDevice(device)}
-                  onMouseEnter={() => setHoveredCard(idx)}
-                  onMouseLeave={() => setHoveredCard(null)}
+                <div key={idx} onClick={() => setSelectedDevice(device)} onMouseEnter={() => setHoveredCard(idx)} onMouseLeave={() => setHoveredCard(null)}
                   style={{
                     background: hov ? (isDark ? 'rgba(14,165,233,0.05)' : 'rgba(14,165,233,0.03)') : theme.surface,
                     border: `1px solid ${hov ? '#0ea5e9' : resolved ? theme.border : theme.textDim}`,
                     borderRadius: '14px', padding: '20px', cursor: 'pointer',
                     transform: hov ? 'translateY(-3px)' : 'translateY(0)',
                     boxShadow: hov ? '0 8px 30px rgba(14,165,233,0.15)' : 'none',
-                    transition: 'all 0.2s ease',
-                    position: 'relative', overflow: 'hidden',
+                    transition: 'all 0.2s ease', position: 'relative', overflow: 'hidden',
                   }}
                 >
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: resolved ? 'linear-gradient(90deg, #0ea5e9, #8b5cf6)' : 'transparent', opacity: hov ? 1 : 0.6, transition: 'opacity 0.2s' }} />
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                    <div style={{
-                      width: '36px', height: '36px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: resolved ? 'rgba(14,165,233,0.12)' : 'rgba(100,116,139,0.1)',
-                    }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={resolved ? '#0ea5e9' : '#64748b'} strokeWidth="1.5">
-                        <path d="M20 16V7a2 2 0 00-2-2H6a2 2 0 00-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 01-.9 1.45H3.62a1 1 0 01-.9-1.45L4 16"/>
-                      </svg>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: resolved ? 'rgba(14,165,233,0.12)' : 'rgba(100,116,139,0.1)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={resolved ? '#0ea5e9' : '#64748b'} strokeWidth="1.5"><path d="M20 16V7a2 2 0 00-2-2H6a2 2 0 00-2 2v9m16 0H4m16 0l1.28 2.55a1 1 0 01-.9 1.45H3.62a1 1 0 01-.9-1.45L4 16"/></svg>
                     </div>
-                    <span style={{
-                      fontSize: '0.68rem', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase',
-                      padding: '3px 8px', borderRadius: '20px',
-                      background: resolved ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)',
-                      color: resolved ? '#10b981' : '#64748b',
-                    }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '20px', background: resolved ? 'rgba(16,185,129,0.12)' : 'rgba(100,116,139,0.1)', color: resolved ? '#10b981' : '#64748b' }}>
                       {resolved ? '● Online' : '○ Pending'}
                     </span>
                   </div>
 
                   <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '700', marginBottom: '4px' }}>Hostname</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: '800', color: resolved ? theme.text : theme.textMuted, marginBottom: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '1.1rem', fontWeight: '800', color: resolved ? theme.text : theme.textMuted, marginBottom: hasOwner ? '4px' : '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {device.name}
                   </div>
+                  {hasOwner && (
+                    <div style={{ fontSize: '0.75rem', color: '#8b5cf6', fontWeight: '700', marginBottom: '10px' }}>
+                      👤 {owners[device.name]}
+                    </div>
+                  )}
 
                   <div style={{ paddingTop: '14px', borderTop: `1px dashed ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
@@ -601,12 +711,10 @@ export default function App() {
     </div>
   );
 
-  // ── RENDER: Vulnerabilities ──
   const renderVulnerabilities = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '24px' }}>
         <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700', marginBottom: '16px' }}>Threat Intelligence</div>
-        
         {[
           { sev: 'HIGH', port: 3389, name: 'RDP Exposed', ip: '192.168.1.45', desc: 'Remote Desktop Protocol exposed to subnet — brute-force risk.', color: '#ef4444' },
           { sev: 'MED', port: 23, name: 'Telnet Active', ip: '192.168.1.12', desc: 'Unencrypted Telnet service detected on LAN device.', color: '#f59e0b' },
@@ -627,7 +735,6 @@ export default function App() {
             </div>
           </div>
         ))}
-
         <div style={{ padding: '16px', background: isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.03)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           <span style={{ fontSize: '0.85rem', color: '#10b981' }}>No critical 0-day CVEs detected in current scan window.</span>
@@ -636,16 +743,12 @@ export default function App() {
     </div>
   );
 
-  // ── RENDER: Endpoints ──
   const renderEndpoints = () => (
     <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '16px', overflow: 'hidden' }}>
-      {/* Search + toolbar */}
       <div style={{ padding: '16px 20px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between' }}>
         <div style={{ position: 'relative' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="1.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
-          <input value={filterQuery} onChange={e => setFilterQuery(e.target.value)} placeholder="Search endpoints…"
-            style={{ background: isDark ? '#111827' : '#f8fafc', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '8px 12px 8px 32px', color: theme.text, fontSize: '0.82rem', outline: 'none', width: '220px' }}
-          />
+          <input value={filterQuery} onChange={e => setFilterQuery(e.target.value)} placeholder="Search endpoints or owner…" style={{ background: isDark ? '#111827' : '#f8fafc', border: `1px solid ${theme.border}`, borderRadius: '8px', padding: '8px 12px 8px 32px', color: theme.text, fontSize: '0.82rem', outline: 'none', width: '240px' }} />
         </div>
         <div style={{ fontSize: '0.78rem', color: theme.textMuted }}>{filteredDevices.length} endpoint{filteredDevices.length !== 1 ? 's' : ''}</div>
       </div>
@@ -653,14 +756,14 @@ export default function App() {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: isDark ? 'rgba(0,0,0,0.2)' : '#f8fafc' }}>
-            {['Status', 'Hostname', 'IP Address', 'MAC', 'Vendor'].map(h => (
+            {['Status', 'Hostname', 'Owner', 'IP Address', 'MAC', 'Vendor'].map(h => (
               <th key={h} style={{ padding: '13px 20px', color: h === 'Hostname' ? '#0ea5e9' : theme.textMuted, fontSize: '0.68rem', letterSpacing: '1.5px', textAlign: 'left', textTransform: 'uppercase', fontWeight: '700' }}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {filteredDevices.length === 0 && (
-            <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '0.9rem' }}>No endpoints found. Run a discovery sweep.</td></tr>
+            <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '0.9rem' }}>No endpoints found.</td></tr>
           )}
           {filteredDevices.map((d, i) => (
             <tr key={i} onClick={() => setSelectedDevice(d)} style={{ borderTop: `1px solid ${theme.border}`, cursor: 'pointer', transition: 'background 0.15s' }}
@@ -671,6 +774,9 @@ export default function App() {
                 <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: '700' }}>● ONLINE</span>
               </td>
               <td style={{ padding: '14px 20px', fontWeight: '700', color: d.name !== 'Unresolved Node' ? theme.text : theme.textMuted, fontSize: '0.9rem' }}>{d.name}</td>
+              <td style={{ padding: '14px 20px', color: owners[d.name] ? '#8b5cf6' : theme.textMuted, fontSize: '0.85rem', fontWeight: owners[d.name] ? '600' : '400' }}>
+                {owners[d.name] ? `👤 ${owners[d.name]}` : '—'}
+              </td>
               <td style={{ padding: '14px 20px', fontFamily: 'monospace', color: '#0ea5e9', fontSize: '0.85rem' }}>{d.ip}</td>
               <td style={{ padding: '14px 20px', fontFamily: 'monospace', color: theme.textMuted, fontSize: '0.8rem' }}>{d.mac || '—'}</td>
               <td style={{ padding: '14px 20px', color: theme.textMuted, fontSize: '0.85rem' }}>{d.vendor || 'Unknown'}</td>
@@ -681,7 +787,6 @@ export default function App() {
     </div>
   );
 
-  // ── RENDER: Host System ──
   const renderHostSystem = () => {
     if (!hostData) return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '12px', color: theme.textMuted }}>
@@ -689,16 +794,12 @@ export default function App() {
         Querying host hardware...
       </div>
     );
-
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {/* OS card */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '24px' }}>
             <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ padding: '10px', background: 'rgba(14,165,233,0.1)', borderRadius: '10px', color: '#0ea5e9' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 21h8m-4-4v4M3 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
-              </div>
+              <div style={{ padding: '10px', background: 'rgba(14,165,233,0.1)', borderRadius: '10px', color: '#0ea5e9' }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 21h8m-4-4v4M3 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg></div>
               <div>
                 <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700' }}>Operating System</div>
                 <div style={{ fontSize: '1.2rem', fontWeight: '800', color: theme.text, marginTop: '2px' }}>{hostData.os}</div>
@@ -709,41 +810,27 @@ export default function App() {
               <span style={{ fontFamily: 'monospace', color: '#0ea5e9', fontSize: '0.85rem', fontWeight: '600' }}>{hostData.hostname}</span>
             </div>
           </div>
-
           <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '24px' }}>
             <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ padding: '10px', background: 'rgba(139,92,246,0.1)', borderRadius: '10px', color: '#8b5cf6' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
-              </div>
+              <div style={{ padding: '10px', background: 'rgba(139,92,246,0.1)', borderRadius: '10px', color: '#8b5cf6' }}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg></div>
               <div>
                 <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700' }}>Processor</div>
                 <div style={{ fontSize: '0.95rem', fontWeight: '700', color: theme.text, marginTop: '2px', lineHeight: '1.3' }}>{hostData.cpu}</div>
               </div>
             </div>
             <div style={{ paddingTop: '16px', borderTop: `1px dashed ${theme.border}`, display: 'flex', gap: '24px' }}>
-              <div>
-                <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>Physical Cores</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#8b5cf6', fontFamily: 'monospace' }}>{hostData.cores}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>Logical Threads</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#8b5cf6', fontFamily: 'monospace' }}>{hostData.threads}</div>
-              </div>
+              <div><div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>Physical Cores</div><div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#8b5cf6', fontFamily: 'monospace' }}>{hostData.cores}</div></div>
+              <div><div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>Logical Threads</div><div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#8b5cf6', fontFamily: 'monospace' }}>{hostData.threads}</div></div>
             </div>
           </div>
         </div>
-
-        {/* Gauges */}
         <div style={{ background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: '16px', padding: '24px' }}>
           <div style={{ fontSize: '0.68rem', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: '700', marginBottom: '24px' }}>Resource Utilisation</div>
           <div style={{ display: 'flex', gap: '40px', alignItems: 'center', flexWrap: 'wrap' }}>
             <GaugeRing percent={hostData.ram_percent} color={hostData.ram_percent > 80 ? '#ef4444' : '#0ea5e9'} size={90} label="RAM Usage" value={hostData.ram_total} />
             <GaugeRing percent={hostData.disk_percent} color={hostData.disk_percent > 80 ? '#ef4444' : '#10b981'} size={90} label="Disk Usage" value={hostData.disk_total} />
             <div style={{ flex: 1, minWidth: '200px' }}>
-              {[
-                { label: 'System Memory', val: hostData.ram_percent, total: hostData.ram_total, color: hostData.ram_percent > 80 ? '#ef4444' : '#0ea5e9' },
-                { label: 'Primary Disk', val: hostData.disk_percent, total: hostData.disk_total, color: hostData.disk_percent > 80 ? '#ef4444' : '#10b981' },
-              ].map(({ label, val, total, color }) => (
+              {[{ label: 'System Memory', val: hostData.ram_percent, total: hostData.ram_total, color: hostData.ram_percent > 80 ? '#ef4444' : '#0ea5e9' }, { label: 'Primary Disk', val: hostData.disk_percent, total: hostData.disk_total, color: hostData.disk_percent > 80 ? '#ef4444' : '#10b981' }].map(({ label, val, total, color }) => (
                 <div key={label} style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: '600', color: theme.text }}>{label}</span>
@@ -763,16 +850,13 @@ export default function App() {
 
   const MENUS = ['Telemetry', 'Topography', 'Vulnerabilities', 'Endpoints', 'Host System'];
   const MENU_ICONS = {
-    Telemetry: "M22 12h-4l-3 9L9 3l-3 9H2",
-    Topography: "M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01",
-    Vulnerabilities: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
-    Endpoints: "M8 21h8m-4-4v4M3 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z",
+    Telemetry: "M22 12h-4l-3 9L9 3l-3 9H2", Topography: "M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01",
+    Vulnerabilities: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z", Endpoints: "M8 21h8m-4-4v4M3 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z",
     'Host System': "M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18",
   };
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: theme.bg, color: theme.text, display: 'flex', flexDirection: 'column', fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace", transition: 'background 0.3s, color 0.3s' }}>
-
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -783,7 +867,6 @@ export default function App() {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         .menu-btn { transition: all 0.2s; }
         .menu-btn:hover { opacity: 1 !important; }
@@ -794,86 +877,42 @@ export default function App() {
       {/* ── HEADER ── */}
       <header style={{
         height: '68px', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: theme.navBg, backdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${theme.border}`, zIndex: 100, position: 'relative', flexShrink: 0,
+        background: theme.navBg, backdropFilter: 'blur(20px)', borderBottom: `1px solid ${theme.border}`, zIndex: 100, position: 'relative', flexShrink: 0,
       }}>
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ position: 'relative', width: '36px', height: '36px', borderRadius: '9px', background: 'linear-gradient(135deg, #0ea5e9, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 16px rgba(14,165,233,0.4)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
-              <path d="M12 8v4l3 3"/>
-              <circle cx="12" cy="12" r="1" fill="white"/>
-            </svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="1" fill="white"/></svg>
           </div>
           <div>
-            <div style={{ fontSize: '1.05rem', fontWeight: '800', letterSpacing: '-0.5px', lineHeight: 1 }}>
-              NEXUS<span style={{ color: '#0ea5e9' }}>::</span>CORE
-            </div>
+            <div style={{ fontSize: '1.05rem', fontWeight: '800', letterSpacing: '-0.5px', lineHeight: 1 }}>NEXUS<span style={{ color: '#0ea5e9' }}>::</span>CORE</div>
             <div style={{ fontSize: '0.6rem', color: theme.textMuted, letterSpacing: '2px', textTransform: 'uppercase' }}>Network Intelligence</div>
           </div>
         </div>
 
-        {/* Nav */}
         <nav style={{ display: 'flex', gap: '4px', background: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.05)', padding: '4px', borderRadius: '12px', border: `1px solid ${theme.border}` }}>
           {MENUS.map(menu => (
-            <button
-              key={menu}
-              className="menu-btn"
-              onClick={() => setActiveMenu(menu)}
-              style={{
-                padding: '7px 14px', borderRadius: '8px', border: 'none', fontSize: '0.78rem', fontWeight: '700',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-                background: activeMenu === menu ? (isDark ? '#1e2d40' : 'white') : 'transparent',
-                color: activeMenu === menu ? (menu === activeMenu ? '#0ea5e9' : theme.text) : theme.textMuted,
-                boxShadow: activeMenu === menu ? '0 1px 4px rgba(0,0,0,0.2)' : 'none',
-                fontFamily: 'inherit',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d={MENU_ICONS[menu]}/>
-              </svg>
-              {menu}
+            <button key={menu} className="menu-btn" onClick={() => setActiveMenu(menu)} style={{
+              padding: '7px 14px', borderRadius: '8px', border: 'none', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+              background: activeMenu === menu ? (isDark ? '#1e2d40' : 'white') : 'transparent', color: activeMenu === menu ? (menu === activeMenu ? '#0ea5e9' : theme.text) : theme.textMuted,
+              boxShadow: activeMenu === menu ? '0 1px 4px rgba(0,0,0,0.2)' : 'none', fontFamily: 'inherit',
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={MENU_ICONS[menu]}/></svg>{menu}
             </button>
           ))}
         </nav>
 
-        {/* Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Live indicator */}
-          {activeMenu === 'Telemetry' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#10b981', fontWeight: '700', letterSpacing: '1px' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s ease infinite', display: 'block' }} />
-              LIVE
-            </div>
-          )}
-          
-          <button
-            onClick={() => setIsDark(!isDark)}
-            style={{ background: 'none', border: `1px solid ${theme.border}`, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', padding: '7px', display: 'flex', transition: 'all 0.2s', fontFamily: 'inherit' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d={isDark ? "M12 3v1m0 16v1M4.22 4.22l.7.7m12.16 12.16l.7.7M3 12h1m16 0h1M4.92 19.07l.7-.7M18.36 5.64l.7-.7M12 8a4 4 0 100 8 4 4 0 000-8z" : "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"} />
-            </svg>
+          {activeMenu === 'Telemetry' && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#10b981', fontWeight: '700', letterSpacing: '1px' }}><span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'pulse 1.5s ease infinite', display: 'block' }} />LIVE</div>}
+          <button onClick={() => setIsDark(!isDark)} style={{ background: 'none', border: `1px solid ${theme.border}`, borderRadius: '8px', color: theme.textMuted, cursor: 'pointer', padding: '7px', display: 'flex', transition: 'all 0.2s', fontFamily: 'inherit' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d={isDark ? "M12 3v1m0 16v1M4.22 4.22l.7.7m12.16 12.16l.7.7M3 12h1m16 0h1M4.92 19.07l.7-.7M18.36 5.64l.7-.7M12 8a4 4 0 100 8 4 4 0 000-8z" : "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"} /></svg>
           </button>
-
           <div style={{ width: '1px', height: '24px', background: theme.border }} />
-
-          <button
-            onClick={runDiscovery}
-            disabled={loading}
-            style={{
-              background: loading ? 'rgba(14,165,233,0.2)' : 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-              color: loading ? '#0ea5e9' : 'white', border: 'none', padding: '9px 20px', borderRadius: '9px',
-              fontWeight: '800', fontSize: '0.78rem', cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: '7px', letterSpacing: '0.5px',
-              boxShadow: loading ? 'none' : '0 4px 14px rgba(14,165,233,0.4)',
-              transition: 'all 0.2s', fontFamily: 'inherit',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }}>
-              <path d={loading ? "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" : "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"} />
-            </svg>
+          <button onClick={runDiscovery} disabled={loading} style={{
+            background: loading ? 'rgba(14,165,233,0.2)' : 'linear-gradient(135deg, #0ea5e9, #0284c7)', color: loading ? '#0ea5e9' : 'white', border: 'none', padding: '9px 20px', borderRadius: '9px',
+            fontWeight: '800', fontSize: '0.78rem', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '7px', letterSpacing: '0.5px',
+            boxShadow: loading ? 'none' : '0 4px 14px rgba(14,165,233,0.4)', transition: 'all 0.2s', fontFamily: 'inherit',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }}><path d={loading ? "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" : "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"} /></svg>
             {loading ? 'SWEEPING…' : 'INITIATE SCAN'}
           </button>
         </div>
@@ -881,43 +920,22 @@ export default function App() {
 
       {/* ── SCAN OVERLAY ── */}
       {loading && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 200,
-          background: isDark ? 'rgba(6,8,15,0.92)' : 'rgba(240,244,248,0.92)',
-          backdropFilter: 'blur(16px)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '28px',
-        }}>
-          {/* Animated radar */}
-          <div style={{ position: 'relative' }}>
-            <RadarCanvas devices={[]} size={200} />
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.6rem', fontWeight: '800', color: '#0ea5e9', fontFamily: 'monospace' }}>{pct}%</div>
-              </div>
-            </div>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: isDark ? 'rgba(6,8,15,0.92)' : 'rgba(240,244,248,0.92)', backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '28px' }}>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+            <RadarCanvas devices={[]} size={200} isDark={isDark} />
+            <div style={{ fontSize: '3rem', fontWeight: '800', color: '#0ea5e9', fontFamily: 'monospace', lineHeight: 1 }}>{pct}%</div>
           </div>
 
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '0.68rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '3px', marginBottom: '8px' }}>Network Sweep In Progress</div>
             <div style={{ fontSize: '1.1rem', fontWeight: '700', color: theme.text }}>{scanProgress.message}</div>
-            <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: '#0ea5e9', marginTop: '6px', animation: 'blink 1s step-end infinite' }}>
-              {scanProgress.ip && `▶ ${scanProgress.ip}`}
-            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: '#0ea5e9', marginTop: '6px', animation: 'blink 1s step-end infinite' }}>{scanProgress.ip && `▶ ${scanProgress.ip}`}</div>
           </div>
 
           <div style={{ width: '420px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
-              <span>{scanProgress.message}</span>
-              <span>[{scanProgress.current}/{scanProgress.total}]</span>
-            </div>
-            <div style={{ height: '4px', background: '#1e2d40', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{
-                width: `${pct}%`, height: '100%', borderRadius: '2px',
-                background: 'linear-gradient(90deg, #0ea5e9, #8b5cf6)',
-                boxShadow: '0 0 10px #0ea5e9',
-                transition: 'width 0.3s ease',
-              }} />
-            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}><span>{scanProgress.message}</span><span>[{scanProgress.current}/{scanProgress.total}]</span></div>
+            <div style={{ height: '4px', background: '#1e2d40', borderRadius: '2px', overflow: 'hidden' }}><div style={{ width: `${pct}%`, height: '100%', borderRadius: '2px', background: 'linear-gradient(90deg, #0ea5e9, #8b5cf6)', boxShadow: '0 0 10px #0ea5e9', transition: 'width 0.3s ease' }} /></div>
           </div>
         </div>
       )}
@@ -925,26 +943,21 @@ export default function App() {
       {/* ── MAIN ── */}
       <main style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
         <div style={{ maxWidth: '1380px', margin: '0 auto' }}>
-          
-          {/* Page header */}
           <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: '0.65rem', color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '3px', fontWeight: '700', marginBottom: '4px' }}>
-                {['Telemetry', 'Topography', 'Vulnerabilities', 'Endpoints', 'Host System'].indexOf(activeMenu) + 1}/{MENUS.length} — {activeMenu}
-              </div>
+              <div style={{ fontSize: '0.65rem', color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '3px', fontWeight: '700', marginBottom: '4px' }}>{['Telemetry', 'Topography', 'Vulnerabilities', 'Endpoints', 'Host System'].indexOf(activeMenu) + 1}/{MENUS.length} — {activeMenu}</div>
               <h1 style={{ fontSize: '2rem', fontWeight: '800', color: theme.text, letterSpacing: '-1px' }}>{activeMenu}</h1>
               <p style={{ color: theme.textMuted, fontSize: '0.85rem', marginTop: '4px' }}>
-                {activeMenu === 'Topography' && 'Visual map of all discovered nodes on the subnet.'}
+                {activeMenu === 'Topography' && 'Visual map of all discovered nodes and assigned users.'}
                 {activeMenu === 'Telemetry' && 'Real-time bandwidth and packet flow monitoring.'}
                 {activeMenu === 'Vulnerabilities' && 'Threat intelligence and open port analysis.'}
-                {activeMenu === 'Endpoints' && 'Tabular view of all discovered network endpoints.'}
+                {activeMenu === 'Endpoints' && 'Tabular view of all discovered network endpoints and owners.'}
                 {activeMenu === 'Host System' && 'Local machine hardware metrics and system info.'}
               </p>
             </div>
             {scanComplete && (
               <div style={{ fontSize: '0.75rem', color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', padding: '6px 14px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'block' }}/>
-                Scan complete — {devices.length} devices found
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'block' }}/>Scan complete — {devices.length} devices found
               </div>
             )}
           </div>
@@ -958,7 +971,22 @@ export default function App() {
       </main>
 
       {/* ── DEVICE MODAL ── */}
-      <DeviceModal device={selectedDevice} onClose={() => setSelectedDevice(null)} theme={theme} />
+      <DeviceModal 
+        device={selectedDevice} 
+        onClose={() => setSelectedDevice(null)} 
+        theme={theme} 
+        ownerName={selectedDevice ? owners[selectedDevice.name] : ''}
+        onSaveOwner={handleSetOwner}
+      />
+
+      {/* ── TOAST NOTIFICATION ── */}
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)} 
+        />
+      )}
     </div>
   );
 }
